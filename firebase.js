@@ -1,5 +1,5 @@
 const admin = require("firebase-admin");
-const serviceAccount = require("./alertapp-firebase-adminsdk.json"); // Bu dosyayı projeye dahil et
+const serviceAccount = require("./alertapp-server-firebase-adminsdk-fbsvc-33b1c76e8b.json"); 
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
