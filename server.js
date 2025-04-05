@@ -8,16 +8,30 @@ const checkApiKey = require("./middleware/apiKey");
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
-
-// 🔐 API key middleware burada
-app.use(checkApiKey);
+app.use(checkApiKey); // 🔐 API key koruması
 
 const expo = new Expo();
 const TOKENS_COLLECTION = "pushTokens";
 
-// ... (saveToken, getAllTokens fonksiyonları aynı)
+// 🔧 Token kaydetme fonksiyonu
+const saveToken = async (token) => {
+  const existing = await db
+    .collection(TOKENS_COLLECTION)
+    .where("token", "==", token)
+    .get();
 
-// 💾 Token kaydetme
+  if (existing.empty) {
+    await db.collection(TOKENS_COLLECTION).add({ token });
+  }
+};
+
+// 🔧 Tüm token'ları çekme fonksiyonu
+const getAllTokens = async () => {
+  const snapshot = await db.collection(TOKENS_COLLECTION).get();
+  return snapshot.docs.map((doc) => doc.data().token);
+};
+
+// 💾 Token kaydetme endpoint'i
 app.post("/register-token", async (req, res) => {
   const { token } = req.body;
   if (!Expo.isExpoPushToken(token)) {
@@ -31,7 +45,7 @@ app.post("/register-token", async (req, res) => {
   }
 });
 
-// 📤 Bildirim gönderme
+// 📤 Bildirim gönderme endpoint'i
 app.post("/send-notification", async (req, res) => {
   const { title, body, data } = req.body;
 
@@ -59,7 +73,7 @@ app.post("/send-notification", async (req, res) => {
   }
 });
 
-// Test route
+// ✅ Test route
 app.get("/", (req, res) => res.send("✅ API Key protected backend"));
 
 const PORT = process.env.PORT || 3000;
