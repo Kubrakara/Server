@@ -1,80 +1,69 @@
 const express = require("express");
-const bodyParser = require("body-parser");
-const cors = require("cors");
-const { Expo } = require("expo-server-sdk");
-const { db } = require("./firebase");
-const checkApiKey = require("./middleware/apiKey");
+const fetch = require("node-fetch");
+const { db } = require("./firebase_config");
 
 const app = express();
-app.use(cors());
-app.use(bodyParser.json());
-app.use(checkApiKey); // 🔐 API key koruması
+app.use(express.json());
 
-const expo = new Expo();
-const TOKENS_COLLECTION = "pushTokens";
-
-// 🔧 Token kaydetme fonksiyonu
-const saveToken = async (token) => {
-  const existing = await db
-    .collection(TOKENS_COLLECTION)
-    .where("token", "==", token)
-    .get();
-
-  if (existing.empty) {
-    await db.collection(TOKENS_COLLECTION).add({ token });
-  }
-};
-
-// 🔧 Tüm token'ları çekme fonksiyonu
+/**
+ * Firestore'dan tüm push token'ları çek
+ */
 const getAllTokens = async () => {
-  const snapshot = await db.collection(TOKENS_COLLECTION).get();
+  const snapshot = await db.collection("pushTokens").get();
   return snapshot.docs.map((doc) => doc.data().token);
 };
 
-// 💾 Token kaydetme endpoint'i
-app.post("/register-token", async (req, res) => {
-  const { token } = req.body;
-  if (!Expo.isExpoPushToken(token)) {
-    return res.status(400).send({ error: "Invalid Expo Push Token" });
-  }
-  try {
-    await saveToken(token);
-    res.send({ success: true });
-  } catch (e) {
-    res.status(500).send({ error: e.message });
-  }
-});
+/**
+ * Expo'ya push bildirimi gönder
+ */
+const sendExpoPush = async (tokens, title, body, data = {}) => {
+  const messages = tokens.map((token) => ({
+    to: token,
+    sound: "default",
+    title,
+    body,
+    data,
+  }));
 
-// 📤 Bildirim gönderme endpoint'i
-app.post("/send-notification", async (req, res) => {
-  const { title, body, data } = req.body;
+  const response = await fetch("https://exp.host/--/api/v2/push/send", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(messages),
+  });
+
+  return response.json();
+};
+
+/**
+ * Firestore'dan tüm tokenları alıp bildirimi Expo'ya gönder
+ */
+app.get("/send", async (req, res) => {
+  const title = "🚀 Firestore'dan gönderildi!";
+  const body = "Tüm kullanıcılarınıza push bildirimi gitti.";
+  const data = { screen: "Home" };
 
   try {
     const tokens = await getAllTokens();
-    const messages = tokens.map((pushToken) => ({
-      to: pushToken,
-      sound: "default",
-      title,
-      body,
-      data,
-    }));
 
-    const chunks = expo.chunkPushNotifications(messages);
-    const tickets = [];
-
-    for (let chunk of chunks) {
-      const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-      tickets.push(...ticketChunk);
+    if (!tokens.length) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Firestore'da token bulunamadı." });
     }
 
-    res.send({ success: true, tickets });
-  } catch (e) {
-    res.status(500).send({ error: e.message });
+    const result = await sendExpoPush(tokens, title, body, data);
+    return res.json({ success: true, sent: tokens.length, result });
+  } catch (err) {
+    console.error("❌ Bildirim hatası:", err);
+    return res.status(500).json({ error: err.message });
   }
 });
 
-// ✅ Test route
-app.get("/", (req, res) => res.send("✅ API Key protected backend"));
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server is running on port ${PORT}`));
+app.listen(3000, () => {
+  console.log(
+    "🔥 Sadece Firestore -> Expo bildirim sunucusu çalışıyor (port 3000)"
+  );
+});
