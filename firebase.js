@@ -1,12 +1,9 @@
 const admin = require("firebase-admin");
-
-// ✅ ÇÖZÜM: JSON içeriğini ortam değişkeninden alıyoruz
-const serviceAccount = JSON.parse(process.env.FIREBASE_CONFIG);
+const serviceAccount = require("./alertapp-firebase-adminsdk.json"); // Bu dosyayı projeye dahil et
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
 const db = admin.firestore();
-
 module.exports = { db };
