@@ -41,8 +41,9 @@ const sendExpoPush = async (tokens, title, body, data = {}) => {
  * Firestore'dan tüm tokenları alıp bildirimi Expo'ya gönder
  */
 app.get("/send", async (req, res) => {
-  const title = "🚀 Firestore'dan gönderildi!";
-  const body = "Tüm kullanıcılarınıza push bildirimi gitti.";
+  const title = "🔥 Yangın Alarmı";
+  const body =
+    "Bölgenizde hızla yayılan bir yangın tespit edildi. Yetkililerin tahliye talimatlarını takip ediniz.";
   const data = { screen: "Home" };
 
   try {
